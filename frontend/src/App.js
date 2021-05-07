@@ -35,12 +35,10 @@ const List = ({ persons, filter, removeEntry }) => {
   if (filter !== '') {
     persons = persons.filter(person => person.name.toLowerCase().includes(filter))
   }
-  console.log(persons)
   return (
     <div>
       <ul>
         {persons.map((person, i) => {
-          console.log('person name: ', person.name, 'person id: ', person.id)
           return (
                   <div>
                     <li key={i}> {person.name} - {person.number} </li> <DeleteButton id={person.id} removeEntry={removeEntry} />
@@ -52,11 +50,10 @@ const List = ({ persons, filter, removeEntry }) => {
   )
 }
 const DeleteButton = ({ id, removeEntry }) => {
-  console.log(id)
   return <button onClick={() => removeEntry(id)} value={id}>delete</button>
 }
 
-const Message = ({ successMessage, updateError }) => {
+const SuccessPopup = ({ successMessage }) => {
   const successStyle = {
     color: 'green',
     fontStyle: 'italic',
@@ -66,7 +63,16 @@ const Message = ({ successMessage, updateError }) => {
     textAlign: 'center',
     border: '3px solid green'
   }
-  const updateErrorStyle = {
+  if (successMessage === false) {return null}
+  return (
+    <div style={successStyle}>
+      You successfully created a new entry.
+    </div>
+  )
+}
+
+const ErrorPopup = ({ errorMessage, errorState }) => {
+  const errorStyle = {
     color: 'red',
     fontStyle: 'italic',
     fontSize: 40,
@@ -76,23 +82,12 @@ const Message = ({ successMessage, updateError }) => {
     //borderColor: 'green',
     border: '3px solid red'    
   }
-  if (successMessage === false && updateError === false) {
-    return null
-  }
-  else if (successMessage === true) {
-    return (
-      <div style={successStyle}>
-        You successfully created a new entry.
-      </div>
-    )
-  }
-  else if (updateError === true) {
-    return (
-      <div style={updateErrorStyle}>
-        Error: Entry has already been removed from server!
-      </div>
-    )   
-  }
+  if (!errorState) {return null}
+  return (
+    <div style={errorStyle}>
+      Error: {errorMessage}
+    </div>
+  )
 }
 
 const App = () => {
@@ -101,7 +96,8 @@ const App = () => {
   const [ newNumber, setNewNumber ] = useState('')
   const [ filter, setNewFilter ] = useState('')
   const [ successMessage, setSuccess ] = useState(false)
-  const [ updateError, setUpdateError ] = useState(false)
+  const [ errorMessage, setErrorMessage ] = useState('')
+  const [ errorState, setErrorState ] = useState(false)
 
   //fetching data from server
   const hook = () => {
@@ -151,16 +147,25 @@ const App = () => {
     // POST new person to server, imported from persons.js !!!
     personsService
       .create(newName, newNumber)
-      .then(response => hook()) //update persons from backend
+      .then(response => {
+        setSuccess(true); //show success message when new entry was successful
+        setTimeout(() => {
+          setSuccess(false)
+        }, 5000 ) //remove success message after 5 seconds
+        hook()}) //update persons from backend
+      .catch(error => {
+        setErrorMessage(error.response.date)
+        setErrorState(true)
+        setTimeout(() => {
+          setErrorMessage('')
+          setErrorState(false)
+        }, 5000)
+      })
 
     // Reset the entry states so that a new entry or filter can be created
     setNewName('');
     setNewNumber('');
     setNewFilter('');
-    setSuccess(true); //show success message when new entry was successful
-    setTimeout(() => {
-      setSuccess(false)
-    }, 5000 ) //remove success message after 5 seconds
   }
 
   const updateEntry = (found) => {
@@ -170,15 +175,19 @@ const App = () => {
     personsService
       .update(found.id, updatedPerson)
       .then(returnedPerson => {
-        console.log('returnedPerson: ', returnedPerson);
-        setPersons(persons.map(person => person.id !== found.id ? person : returnedPerson));
+        hook()
+        //console.log('returnedPerson: ', returnedPerson);
+        //setPersons(persons.map(person => person.id !== found.id ? person : returnedPerson));
     })
-      .catch(err => {
-        setUpdateError(true);
-        setTimeout(() => {
-          setUpdateError(false)
-        }, 5000)
-      })
+    .catch(error => {
+      setErrorMessage(error.response.date)
+      setErrorState(true)
+      setTimeout(() => {
+        setErrorMessage('')
+        setErrorState(false)
+      }, 5000)
+    })
+
     return
   }
 
@@ -201,7 +210,8 @@ const App = () => {
   return (
     <div>
       <h2>Phonebook</h2>
-      <Message successMessage={successMessage} updateError={updateError} />
+      <SuccessPopup successMessage={successMessage} />
+      <ErrorPopup errorMessage={errorMessage} errorState={errorState} />
       <Filter filter={filter} changeFilter={changeFilter} />
       <h2>add new</h2>
       <Form newName={newName} newNumber={newNumber} addEntry={addEntry} handleNameChange={handleNameChange} handleNumberChange={handleNumberChange} />
